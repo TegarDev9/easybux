@@ -3,6 +3,8 @@ import subprocess
 import os
 import requests
 import time
+import zipfile
+import io
 
 # --- Konfigurasi Aplikasi ---
 st.set_page_config(page_title="EasyBux Bot Runner", layout="wide", initial_sidebar_state="collapsed")
@@ -15,30 +17,43 @@ def check_credentials(username, password):
     return username == "Tegarkaruniailham" and password == "Tegarilham4444"
 
 def download_repo():
-    """Mengunduh dan mengekstrak repositori skrip dari GitHub."""
+    """Mengunduh dan mengekstrak repositori menggunakan pustaka Python."""
     repo_url = "https://github.com/Inject-ID/easybux/archive/refs/heads/main.zip"
     with st.spinner("Mengunduh skrip dari GitHub... Ini mungkin perlu waktu sejenak."):
         try:
-            # Mengunduh file zip
+            # Mengunduh file zip ke dalam memori
             r = requests.get(repo_url, stream=True)
-            r.raise_for_status()
-            with open("easybux.zip", "wb") as f:
-                for chunk in r.iter_content(chunk_size=8192):
-                    f.write(chunk)
+            r.raise_for_status() # Pastikan unduhan berhasil
             
-            # Mengekstrak file zip
-            # Perintah '-o' akan menimpa file tanpa bertanya
-            subprocess.run(["unzip", "-o", "easybux.zip"], check=True, capture_output=True)
+            # Menggunakan zipfile untuk mengekstrak langsung dari memori
+            with zipfile.ZipFile(io.BytesIO(r.content)) as z:
+                z.extractall(".") # Ekstrak ke direktori saat ini
             
-            # Menghapus file zip setelah diekstrak
-            os.remove("easybux.zip")
-            st.success("Skrip berhasil diunduh dan diekstrak ke folder 'easybux-master'.")
+            # Ganti nama folder hasil ekstrak agar konsisten
+            # Nama default dari GitHub adalah 'reponame-branchname'
+            original_dir_name = "easybux-main" # Perhatikan, GitHub mengubah dari master ke main
+            target_dir_name = "easybux-master" # Nama yang digunakan di sisa skrip
+            
+            # Hapus direktori target lama jika ada untuk menghindari error
+            if os.path.exists(target_dir_name):
+                 # Hapus direktori secara rekursif (jika diperlukan)
+                import shutil
+                shutil.rmtree(target_dir_name)
+
+            # Ganti nama folder yang baru diekstrak
+            if os.path.exists(original_dir_name):
+                os.rename(original_dir_name, target_dir_name)
+
+            st.success(f"Skrip berhasil diunduh dan diekstrak ke folder '{target_dir_name}'.")
             return True
-        except subprocess.CalledProcessError as e:
-            st.error(f"Gagal mengekstrak file. Pastikan 'unzip' terinstal. Error: {e.stderr.decode()}")
+        except zipfile.BadZipFile:
+            st.error("Gagal mengekstrak file. File yang diunduh bukan file zip yang valid.")
+            return False
+        except requests.exceptions.RequestException as e:
+            st.error(f"Gagal mengunduh repositori dari URL. Error: {e}")
             return False
         except Exception as e:
-            st.error(f"Gagal mengunduh repositori: {e}")
+            st.error(f"Terjadi kesalahan saat memproses repo: {e}")
             return False
 
 def main_app():
@@ -46,7 +61,7 @@ def main_app():
     st.title("🤖 EasyBux Bot Runner")
     st.caption("Menjalankan skrip 'bot.php' dari Inject-ID/easybux melalui antarmuka web.")
     
-    # Tombol Logout
+    st.sidebar.title("Navigasi")
     if st.sidebar.button("Logout"):
         st.session_state.logged_in = False
         st.rerun()
@@ -56,7 +71,7 @@ def main_app():
 
     with col1:
         st.header("⚙️ Pengaturan Bot")
-        st.write("Skrip ini memerlukan beberapa input dari Anda untuk berjalan dengan benar.")
+        st.write("Isi konfigurasi berikut untuk menjalankan bot.")
 
         # Cek dan unduh direktori skrip
         script_dir = "easybux-master"
@@ -64,7 +79,7 @@ def main_app():
             st.warning("Direktori skrip 'easybux-master' tidak ditemukan.")
             if st.button("Unduh Skrip Sekarang"):
                 if download_repo():
-                    st.rerun() # Muat ulang halaman untuk memperbarui status
+                    st.rerun()
         else:
             st.success("Direktori skrip 'easybux-master' sudah siap.")
 
@@ -89,25 +104,22 @@ def main_app():
                     st.header("📝 Log Eksekusi")
                     st.info("Mempersiapkan dan menjalankan skrip 'bot.php'...")
                     
-                    # Membuat file config.php yang diperlukan oleh bot.php
                     config_content = f'<?php\n$user_agent = "{user_agent}";\n$cookie = "{cookie}";\n?>'
                     try:
                         with open(os.path.join(script_dir, "config.php"), "w") as f:
                             f.write(config_content)
                         st.write("✅ File 'config.php' berhasil dibuat dengan kredensial Anda.")
 
-                        # Menjalankan skrip PHP menggunakan subprocess
                         process = subprocess.Popen(
-                            ["php", os.path.join(script_dir, "bot.php")],
+                            ["php", "bot.php"],
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE,
                             text=True,
                             bufsize=1,
                             universal_newlines=True,
-                            cwd=script_dir # Menjalankan perintah dari dalam direktori skrip
+                            cwd=script_dir
                         )
 
-                        # Menampilkan output secara real-time
                         output_placeholder = st.empty()
                         log_output = ""
                         for line in iter(process.stdout.readline, ''):
@@ -115,11 +127,10 @@ def main_app():
                             output_placeholder.code(log_output, language="bash")
                         
                         process.stdout.close()
-                        return_code = process.wait()
+                        process.wait()
                         
                         st.success("Eksekusi skrip selesai.")
-
-                        # Menampilkan error jika ada
+                        
                         stderr_output = process.stderr.read()
                         if stderr_output:
                             st.error("Pesan Error dari Skrip:")
@@ -128,8 +139,8 @@ def main_app():
                     except FileNotFoundError:
                         st.error("Perintah 'php' tidak ditemukan.")
                         st.warning(
-                            "Pastikan PHP terinstal di lingkungan. Jika menggunakan Streamlit Cloud, "
-                            "tambahkan 'php' dan 'unzip' ke file 'packages.txt' Anda."
+                            "Pastikan 'php' terinstal. Jika menggunakan Streamlit Cloud, "
+                            "tambahkan 'php' ke file 'packages.txt' Anda."
                         )
                     except Exception as e:
                         st.error(f"Terjadi kesalahan yang tidak terduga: {e}")
@@ -141,15 +152,13 @@ def main_app():
         2.  **Isi Formulir**:
             * **User Agent**: Sebaiknya gunakan User Agent dari browser yang sama saat Anda mengambil cookie.
             * **Cookie**: Ini adalah bagian terpenting. Dapatkan dari *Developer Tools* (F12) di browser Anda setelah login ke EasyBux.
-        3.  **Jalankan Bot**: Klik tombol "Jalankan Bot" dan pantau hasilnya di panel "Log Eksekusi" di sebelah kanan.
-
+        3.  **Jalankan Bot**: Klik tombol "Jalankan Bot" dan pantau hasilnya di panel "Log Eksekusi".
         ---
         **Penting Mengenai Deteksi Bot:**
         * **Cookie adalah Kunci**: Cookie yang salah atau kedaluwarsa adalah penyebab kegagalan paling umum.
         * **Alamat IP**: Aplikasi ini berjalan di server Streamlit. Beberapa situs mungkin memblokir IP dari pusat data.
-        * **Frekuensi Permintaan**: Skrip ini mungkin membuat permintaan dengan cepat. Penggunaan berlebihan dapat menyebabkan pemblokiran sementara.
+        * **Frekuensi Permintaan**: Penggunaan berlebihan dapat menyebabkan pemblokiran sementara oleh situs target.
         """)
-
 
 # --- Logika Halaman Login ---
 if 'logged_in' not in st.session_state:
@@ -169,9 +178,8 @@ else:
         if submitted:
             if check_credentials(username, password):
                 st.session_state.logged_in = True
-                st.success("Login berhasil!")
-                time.sleep(1) # Jeda sejenak agar pesan terlihat
+                st.success("Login berhasil! Mengalihkan...")
+                time.sleep(1)
                 st.rerun()
             else:
                 st.error("Username atau password salah.")
-
