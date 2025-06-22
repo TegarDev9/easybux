@@ -5,6 +5,7 @@ import requests
 import time
 import zipfile
 import io
+import shutil
 
 # --- Konfigurasi Aplikasi ---
 st.set_page_config(page_title="EasyBux Bot Runner", layout="wide", initial_sidebar_state="collapsed")
@@ -21,37 +22,23 @@ def download_repo():
     repo_url = "https://github.com/Inject-ID/easybux/archive/refs/heads/main.zip"
     with st.spinner("Mengunduh skrip dari GitHub... Ini mungkin perlu waktu sejenak."):
         try:
-            # Mengunduh file zip ke dalam memori
             r = requests.get(repo_url, stream=True)
-            r.raise_for_status() # Pastikan unduhan berhasil
+            r.raise_for_status()
             
-            # Menggunakan zipfile untuk mengekstrak langsung dari memori
             with zipfile.ZipFile(io.BytesIO(r.content)) as z:
-                z.extractall(".") # Ekstrak ke direktori saat ini
+                z.extractall(".")
             
-            # Ganti nama folder hasil ekstrak agar konsisten
-            # Nama default dari GitHub adalah 'reponame-branchname'
-            original_dir_name = "easybux-main" # Perhatikan, GitHub mengubah dari master ke main
-            target_dir_name = "easybux-master" # Nama yang digunakan di sisa skrip
+            original_dir_name = "easybux-main"
+            target_dir_name = "easybux-master"
             
-            # Hapus direktori target lama jika ada untuk menghindari error
             if os.path.exists(target_dir_name):
-                 # Hapus direktori secara rekursif (jika diperlukan)
-                import shutil
                 shutil.rmtree(target_dir_name)
 
-            # Ganti nama folder yang baru diekstrak
             if os.path.exists(original_dir_name):
                 os.rename(original_dir_name, target_dir_name)
 
             st.success(f"Skrip berhasil diunduh dan diekstrak ke folder '{target_dir_name}'.")
             return True
-        except zipfile.BadZipFile:
-            st.error("Gagal mengekstrak file. File yang diunduh bukan file zip yang valid.")
-            return False
-        except requests.exceptions.RequestException as e:
-            st.error(f"Gagal mengunduh repositori dari URL. Error: {e}")
-            return False
         except Exception as e:
             st.error(f"Terjadi kesalahan saat memproses repo: {e}")
             return False
@@ -73,7 +60,6 @@ def main_app():
         st.header("⚙️ Pengaturan Bot")
         st.write("Isi konfigurasi berikut untuk menjalankan bot.")
 
-        # Cek dan unduh direktori skrip
         script_dir = "easybux-master"
         if not os.path.exists(script_dir):
             st.warning("Direktori skrip 'easybux-master' tidak ditemukan.")
@@ -83,14 +69,30 @@ def main_app():
         else:
             st.success("Direktori skrip 'easybux-master' sudah siap.")
 
+        # Opsi menu yang akan dikirim ke skrip bot.php
+        # Kunci adalah teks yang ditampilkan, nilai adalah angka yang dikirim
+        # **PENTING**: Sesuaikan nomor ini dengan menu yang ada di bot.php
+        bot_options = {
+            "Cek Info Akun": "1",
+            "Mulai Auto Claim": "3",
+            "Lihat Opsi Lain (sesuaikan nomor)": "2" 
+        }
+
         # Formulir Konfigurasi
         with st.form("bot_config_form"):
+            st.subheader("1. Kredensial Anda")
             user_agent = st.text_input(
                 "User Agent", 
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
-                help="Gunakan User Agent dari browser yang Anda gunakan untuk login."
             )
             cookie = st.text_area("Cookie", help="Masukkan cookie dari sesi login Anda di situs EasyBux.")
+            
+            st.subheader("2. Pilih Tugas Bot")
+            pilihan_tugas = st.radio(
+                "Pilih tugas yang ingin dijalankan:",
+                options=list(bot_options.keys()),
+                help="Opsi ini akan dikirim sebagai input ke skrip PHP. Pastikan nomornya sesuai dengan menu di skrip."
+            )
             
             submit_button = st.form_submit_button(label="🚀 Jalankan Bot")
 
@@ -102,16 +104,20 @@ def main_app():
             else:
                 with col2:
                     st.header("📝 Log Eksekusi")
-                    st.info("Mempersiapkan dan menjalankan skrip 'bot.php'...")
+                    st.info(f"Mempersiapkan bot untuk tugas: '{pilihan_tugas}'...")
                     
+                    nomor_pilihan = bot_options[pilihan_tugas]
                     config_content = f'<?php\n$user_agent = "{user_agent}";\n$cookie = "{cookie}";\n?>'
+                    
                     try:
                         with open(os.path.join(script_dir, "config.php"), "w") as f:
                             f.write(config_content)
-                        st.write("✅ File 'config.php' berhasil dibuat dengan kredensial Anda.")
+                        st.write("✅ File 'config.php' berhasil dibuat.")
 
+                        # Menjalankan skrip dan mempersiapkan untuk mengirim input
                         process = subprocess.Popen(
                             ["php", "bot.php"],
+                            stdin=subprocess.PIPE,  # PENTING: untuk mengirim input
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE,
                             text=True,
@@ -120,6 +126,13 @@ def main_app():
                             cwd=script_dir
                         )
 
+                        # Mengirim pilihan menu ke skrip PHP
+                        # Kita tambahkan '\n' untuk mensimulasikan penekanan tombol Enter
+                        process.stdin.write(f"{nomor_pilihan}\n")
+                        process.stdin.flush() # Pastikan input terkirim
+                        process.stdin.close() # Tutup input setelah selesai
+
+                        # Menampilkan output dari skrip
                         output_placeholder = st.empty()
                         log_output = ""
                         for line in iter(process.stdout.readline, ''):
@@ -136,12 +149,6 @@ def main_app():
                             st.error("Pesan Error dari Skrip:")
                             st.code(stderr_output, language="bash")
 
-                    except FileNotFoundError:
-                        st.error("Perintah 'php' tidak ditemukan.")
-                        st.warning(
-                            "Pastikan 'php' terinstal. Jika menggunakan Streamlit Cloud, "
-                            "tambahkan 'php' ke file 'packages.txt' Anda."
-                        )
                     except Exception as e:
                         st.error(f"Terjadi kesalahan yang tidak terduga: {e}")
 
@@ -150,14 +157,13 @@ def main_app():
         st.markdown("""
         1.  **Unduh Skrip**: Jika diminta, klik tombol "Unduh Skrip Sekarang".
         2.  **Isi Formulir**:
-            * **User Agent**: Sebaiknya gunakan User Agent dari browser yang sama saat Anda mengambil cookie.
-            * **Cookie**: Ini adalah bagian terpenting. Dapatkan dari *Developer Tools* (F12) di browser Anda setelah login ke EasyBux.
+            * **Kredensial**: Masukkan `User Agent` dan `Cookie` Anda.
+            * **Pilih Tugas Bot**: Pilih aksi yang ingin Anda otomatiskan. Opsi ini akan memilih nomor secara otomatis untuk Anda.
         3.  **Jalankan Bot**: Klik tombol "Jalankan Bot" dan pantau hasilnya di panel "Log Eksekusi".
         ---
-        **Penting Mengenai Deteksi Bot:**
-        * **Cookie adalah Kunci**: Cookie yang salah atau kedaluwarsa adalah penyebab kegagalan paling umum.
-        * **Alamat IP**: Aplikasi ini berjalan di server Streamlit. Beberapa situs mungkin memblokir IP dari pusat data.
-        * **Frekuensi Permintaan**: Penggunaan berlebihan dapat menyebabkan pemblokiran sementara oleh situs target.
+        **PENTING: Menyesuaikan Nomor Pilihan**
+        * Skrip ini mengasumsikan bahwa 'Auto Claim' adalah **opsi nomor 3** di menu `bot.php`.
+        * Jika di skrip aslinya nomornya berbeda (misalnya nomor 2 atau 4), Anda perlu **mengubahnya di kode Python** pada bagian `bot_options`.
         """)
 
 # --- Logika Halaman Login ---
@@ -167,7 +173,7 @@ if 'logged_in' not in st.session_state:
 if st.session_state.logged_in:
     main_app()
 else:
-    st.title("🔐 Halaman Login")
+    st.title("� Halaman Login")
     st.write("Silakan login untuk menggunakan Bot Runner.")
     
     with st.form("login_form"):
@@ -183,3 +189,4 @@ else:
                 st.rerun()
             else:
                 st.error("Username atau password salah.")
+�
