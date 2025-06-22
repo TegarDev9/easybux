@@ -1,38 +1,14 @@
 import streamlit as st
-import subprocess
-import sys
 import time
 import os
-
-# --- Blok Instalasi Dependensi Paksa ---
-# Ini akan mencoba menginstal pustaka yang diperlukan jika belum ada.
-def install_dependencies():
-    st.info("Memeriksa dan menginstal dependensi yang diperlukan...")
-    try:
-        # PERBAIKAN: Mengganti "twocaptcha-python" menjadi "2captcha-python"
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "selenium", "webdriver-manager", "2captcha-python"])
-        st.success("Dependensi berhasil diperiksa dan diinstal.")
-        st.info("Memuat ulang aplikasi untuk menerapkan dependensi baru...")
-        time.sleep(2)
-        st.rerun()
-    except subprocess.CalledProcessError as e:
-        st.error(f"Gagal menginstal dependensi: {e}")
-        st.stop()
-    except ImportError:
-        pass
-
-# Coba import, jika gagal, jalankan instalasi
-try:
-    from selenium import webdriver
-    from selenium.webdriver.common.by import By
-    from selenium.webdriver.chrome.service import Service as ChromeService
-    from selenium.webdriver.chrome.options import Options
-    from selenium.webdriver.support.ui import WebDriverWait
-    from selenium.webdriver.support import expected_conditions as EC
-    from webdriver_manager.chrome import ChromeDriverManager
-    from twocaptcha import TwoCaptcha
-except ImportError:
-    install_dependencies()
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.service import Service as ChromeService
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from webdriver_manager.chrome import ChromeDriverManager
+from twocaptcha import TwoCaptcha
 
 # --- Tampilan Awal dan Konfigurasi ---
 st.set_page_config(page_title="Advanced EasyBux Bot", layout="wide")
