@@ -12,7 +12,7 @@ st.set_page_config(page_title="EasyBux Bot Runner", layout="wide", initial_sideb
 def check_credentials(username, password):
     """Fungsi sederhana untuk memeriksa kredensial login."""
     # Ganti username dan password ini sesuai keinginan Anda
-    return username == "admin" and password == "12345"
+    return username == "Tegarkaruniailham" and password == "Tegarilham4444"
 
 def download_repo():
     """Mengunduh dan mengekstrak repositori skrip dari GitHub."""
