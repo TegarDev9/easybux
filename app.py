@@ -65,7 +65,7 @@ with col1:
         else:
             with col2:
                 st.header("📝 Log Eksekusi")
-                st.info("Mencoba menjalankan skrip 'bot.php'...")
+                st.info("Mencoba menjalankan skrip 'app.py'...")
                 
                 # Membuat file config.php yang diperlukan oleh bot.php
                 config_content = f"""<?php
