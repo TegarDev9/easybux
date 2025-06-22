@@ -6,21 +6,19 @@ import os
 
 # --- Blok Instalasi Dependensi Paksa ---
 # Ini akan mencoba menginstal pustaka yang diperlukan jika belum ada.
-# Ini adalah solusi alternatif untuk mengatasi masalah ModuleNotFoundError di beberapa lingkungan.
 def install_dependencies():
     st.info("Memeriksa dan menginstal dependensi yang diperlukan...")
     try:
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "selenium", "webdriver-manager", "twocaptcha-python"])
+        # PERBAIKAN: Mengganti "twocaptcha-python" menjadi "2captcha-python"
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "selenium", "webdriver-manager", "2captcha-python"])
         st.success("Dependensi berhasil diperiksa dan diinstal.")
-        # Kita perlu memuat ulang halaman setelah instalasi agar modul dikenali
         st.info("Memuat ulang aplikasi untuk menerapkan dependensi baru...")
-        time.sleep(2) # Beri jeda agar pengguna bisa membaca pesan
+        time.sleep(2)
         st.rerun()
     except subprocess.CalledProcessError as e:
         st.error(f"Gagal menginstal dependensi: {e}")
         st.stop()
     except ImportError:
-        # Jika ada error import, jalankan instalasi
         pass
 
 # Coba import, jika gagal, jalankan instalasi
@@ -73,7 +71,6 @@ def get_driver():
     chrome_options.add_argument("--disable-gpu")
     chrome_options.add_argument("--window-size=1920x1080")
     
-    # Menggunakan webdriver-manager untuk mengelola driver secara otomatis
     service = ChromeService(ChromeDriverManager().install())
     driver = webdriver.Chrome(service=service, options=chrome_options)
     return driver
