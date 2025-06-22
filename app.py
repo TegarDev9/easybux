@@ -1,14 +1,40 @@
 import streamlit as st
+import subprocess
+import sys
 import time
 import os
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.service import Service as ChromeService
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from webdriver_manager.chrome import ChromeDriverManager
-from twocaptcha import TwoCaptcha # Pustaka untuk layanan 2Captcha
+
+# --- Blok Instalasi Dependensi Paksa ---
+# Ini akan mencoba menginstal pustaka yang diperlukan jika belum ada.
+# Ini adalah solusi alternatif untuk mengatasi masalah ModuleNotFoundError di beberapa lingkungan.
+def install_dependencies():
+    st.info("Memeriksa dan menginstal dependensi yang diperlukan...")
+    try:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "selenium", "webdriver-manager", "twocaptcha-python"])
+        st.success("Dependensi berhasil diperiksa dan diinstal.")
+        # Kita perlu memuat ulang halaman setelah instalasi agar modul dikenali
+        st.info("Memuat ulang aplikasi untuk menerapkan dependensi baru...")
+        time.sleep(2) # Beri jeda agar pengguna bisa membaca pesan
+        st.rerun()
+    except subprocess.CalledProcessError as e:
+        st.error(f"Gagal menginstal dependensi: {e}")
+        st.stop()
+    except ImportError:
+        # Jika ada error import, jalankan instalasi
+        pass
+
+# Coba import, jika gagal, jalankan instalasi
+try:
+    from selenium import webdriver
+    from selenium.webdriver.common.by import By
+    from selenium.webdriver.chrome.service import Service as ChromeService
+    from selenium.webdriver.chrome.options import Options
+    from selenium.webdriver.support.ui import WebDriverWait
+    from selenium.webdriver.support import expected_conditions as EC
+    from webdriver_manager.chrome import ChromeDriverManager
+    from twocaptcha import TwoCaptcha
+except ImportError:
+    install_dependencies()
 
 # --- Tampilan Awal dan Konfigurasi ---
 st.set_page_config(page_title="Advanced EasyBux Bot", layout="wide")
@@ -39,7 +65,6 @@ def solve_hcaptcha(api_key, site_key, page_url):
 def get_driver():
     """
     Menyiapkan driver Selenium Chrome untuk dijalankan di lingkungan server (headless).
-    Cache_resource digunakan agar driver tidak diinisialisasi ulang setiap kali ada interaksi UI.
     """
     chrome_options = Options()
     chrome_options.add_argument("--headless")
@@ -55,20 +80,17 @@ def get_driver():
 
 # --- Antarmuka Pengguna ---
 
-# Kolom input di sidebar agar lebih rapi
 st.sidebar.header("⚙️ Konfigurasi Bot")
 twocaptcha_api_key = st.sidebar.text_input("1. 2Captcha API Key", type="password", help="Dapatkan API Key dari dasbor akun 2Captcha Anda.")
 cookie_value = st.sidebar.text_input("2. Cookie PHPSESSID", help="Nilai cookie PHPSESSID setelah Anda login di easybux.net.")
 run_button = st.sidebar.button("🚀 Mulai Proses Klaim Otomatis", use_container_width=True)
 
-# Area untuk menampilkan log
 log_placeholder = st.empty()
 log_messages = []
 
 def log(message, level="info"):
     """Fungsi untuk menampilkan pesan log di UI."""
     log_messages.append(message)
-    # Tampilkan pesan terbaru di atas
     log_placeholder.code("\n".join(log_messages[::-1]), language="log")
 
 
@@ -83,9 +105,8 @@ if run_button:
             driver = get_driver()
             log("Driver Selenium berhasil diinisialisasi.")
             
-            # Langkah 1: Membuka situs dan memasang cookie
             log("Membuka situs target: https://easybux.net/")
-            driver.get("https://easybux.net/") # Buka situs dulu untuk mengatur domain cookie
+            driver.get("https://easybux.net/")
             
             log("Menambahkan cookie login (PHPSESSID)...")
             driver.add_cookie({
@@ -95,27 +116,22 @@ if run_button:
             })
             log("Cookie berhasil ditambahkan.")
 
-            # Langkah 2: Navigasi ke halaman Faucet
             faucet_url = "https://easybux.net/faucet"
             log(f"Navigasi ke halaman Faucet: {faucet_url}")
             driver.get(faucet_url)
-            time.sleep(3) # Beri waktu halaman untuk memuat sepenuhnya
+            time.sleep(3)
 
-            # Tunggu hingga tombol "Claim" siap untuk diklik
             wait = WebDriverWait(driver, 20)
             claim_button = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), 'Claim')]")))
             log("Tombol 'Claim' ditemukan.")
             claim_button.click()
             log("Tombol 'Claim' diklik.")
-            time.sleep(5) # Beri waktu agar hCaptcha muncul
+            time.sleep(5)
 
-            # Langkah 3: Deteksi dan selesaikan hCaptcha
             log("Mencari iframe hCaptcha...")
-            # Captcha berada di dalam iframe, kita harus beralih ke dalamnya
             wait.until(EC.frame_to_be_available_and_switch_to_it((By.XPATH, "//iframe[contains(@src, 'hcaptcha.com')]")))
             log("Berhasil masuk ke dalam iframe captcha.")
             
-            # Ambil site-key dari elemen captcha
             hcaptcha_element = wait.until(EC.presence_of_element_located((By.ID, "h-captcha")))
             site_key = hcaptcha_element.get_attribute("data-sitekey")
             
@@ -123,17 +139,11 @@ if run_button:
                 raise Exception("Tidak dapat menemukan data-sitekey hCaptcha.")
 
             log(f"Site-key ditemukan: {site_key[:10]}...")
-
-            # Beralih kembali ke konten utama sebelum memanggil solver
             driver.switch_to.default_content()
 
-            # Panggil fungsi untuk menyelesaikan captcha
             captcha_solution = solve_hcaptcha(twocaptcha_api_key, site_key, faucet_url)
 
             if captcha_solution:
-                # Setelah mendapatkan solusi, kita perlu memasukkannya.
-                # hCaptcha biasanya memasukkan token secara otomatis ke elemen textarea tersembunyi.
-                # Kita akan menggunakan JavaScript untuk melakukannya.
                 log("Memasukkan token solusi captcha ke halaman...")
                 driver.execute_script(
                     f"document.getElementsByName('h-captcha-response')[0].value = '{captcha_solution}';"
@@ -144,14 +154,12 @@ if run_button:
                 log("Token berhasil dimasukkan.")
                 time.sleep(2)
 
-                # Langkah 4: Klik tombol verifikasi akhir
                 verify_button = wait.until(EC.element_to_be_clickable((By.ID, "verifyCaptcha")))
                 log("Tombol verifikasi ditemukan.")
                 verify_button.click()
                 log("Tombol verifikasi diklik. Menunggu hasil...")
                 time.sleep(5)
 
-                # Cek hasil akhir
                 page_source = driver.page_source
                 if "has been added to your balance" in page_source:
                     log("🎉 KLAIM BERHASIL! Saldo telah ditambahkan.", level="success")
