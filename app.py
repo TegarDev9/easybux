@@ -43,6 +43,17 @@ def download_repo():
             st.error(f"Terjadi kesalahan saat memproses repo: {e}")
             return False
 
+def setup_dummy_xdg_open():
+    """Membuat file xdg-open palsu untuk mencegah error di lingkungan server."""
+    xdg_open_path = os.path.join(os.getcwd(), "xdg-open")
+    if not os.path.exists(xdg_open_path):
+        with open(xdg_open_path, "w") as f:
+            f.write("#!/bin/sh\n")
+            f.write("echo 'Mencegat panggilan xdg-open: '$@\n")
+            f.write("exit 0\n")
+        # Membuat file dapat dieksekusi
+        os.chmod(xdg_open_path, 0o755)
+
 def main_app():
     """Fungsi untuk menampilkan antarmuka utama aplikasi setelah login berhasil."""
     st.title("🤖 EasyBux Bot Runner")
@@ -52,6 +63,9 @@ def main_app():
     if st.sidebar.button("Logout"):
         st.session_state.logged_in = False
         st.rerun()
+
+    # Panggil fungsi untuk membuat xdg-open palsu
+    setup_dummy_xdg_open()
 
     # --- UI Utama ---
     col1, col2 = st.columns([1, 2])
@@ -70,15 +84,12 @@ def main_app():
             st.success("Direktori skrip 'easybux-master' sudah siap.")
 
         # Opsi menu yang akan dikirim ke skrip bot.php
-        # Kunci adalah teks yang ditampilkan, nilai adalah angka yang dikirim
-        # **PENTING**: Sesuaikan nomor ini dengan menu yang ada di bot.php
         bot_options = {
             "Cek Info Akun": "1",
             "Mulai Auto Claim": "3",
             "Lihat Opsi Lain (sesuaikan nomor)": "2" 
         }
 
-        # Formulir Konfigurasi
         with st.form("bot_config_form"):
             st.subheader("1. Kredensial Anda")
             user_agent = st.text_input(
@@ -91,7 +102,7 @@ def main_app():
             pilihan_tugas = st.radio(
                 "Pilih tugas yang ingin dijalankan:",
                 options=list(bot_options.keys()),
-                help="Opsi ini akan dikirim sebagai input ke skrip PHP. Pastikan nomornya sesuai dengan menu di skrip."
+                help="Opsi ini akan dikirim sebagai input ke skrip PHP."
             )
             
             submit_button = st.form_submit_button(label="🚀 Jalankan Bot")
@@ -114,7 +125,11 @@ def main_app():
                             f.write(config_content)
                         st.write("✅ File 'config.php' berhasil dibuat.")
 
-                        # Menjalankan skrip dan mempersiapkan untuk mengirim input
+                        # Menyiapkan environment khusus untuk subprocess
+                        my_env = os.environ.copy()
+                        # Menambahkan direktori saat ini ke PATH agar xdg-open palsu ditemukan
+                        my_env["PATH"] = f"{os.getcwd()}:{my_env['PATH']}"
+                        
                         process = subprocess.Popen(
                             ["php", "bot.php"],
                             stdin=subprocess.PIPE,
@@ -123,15 +138,14 @@ def main_app():
                             text=True,
                             bufsize=1,
                             universal_newlines=True,
-                            cwd=script_dir
+                            cwd=script_dir,
+                            env=my_env  # Menggunakan environment yang telah dimodifikasi
                         )
 
-                        # Mengirim pilihan menu ke skrip PHP
                         process.stdin.write(f"{nomor_pilihan}\n")
                         process.stdin.flush()
                         process.stdin.close()
 
-                        # Menampilkan output dari skrip
                         output_placeholder = st.empty()
                         log_output = ""
                         for line in iter(process.stdout.readline, ''):
@@ -155,9 +169,7 @@ def main_app():
         st.header("💡 Cara Penggunaan & Tips")
         st.markdown("""
         1.  **Unduh Skrip**: Jika diminta, klik tombol "Unduh Skrip Sekarang".
-        2.  **Isi Formulir**:
-            * **Kredensial**: Masukkan `User Agent` dan `Cookie` Anda.
-            * **Pilih Tugas Bot**: Pilih aksi yang ingin Anda otomatiskan. Opsi ini akan memilih nomor secara otomatis untuk Anda.
+        2.  **Isi Formulir**: Masukkan `User Agent` dan `Cookie` Anda, lalu pilih tugas bot.
         3.  **Jalankan Bot**: Klik tombol "Jalankan Bot" dan pantau hasilnya di panel "Log Eksekusi".
         ---
         **PENTING: Menyesuaikan Nomor Pilihan**
