@@ -1,3 +1,37 @@
+# ====================================================================================
+# PENTING: CARA MEMPERBAIKI ERROR "ModuleNotFoundError: No module named 'selenium'"
+# ====================================================================================
+#
+# Error ini terjadi karena server Streamlit tidak tahu pustaka apa saja yang 
+# dibutuhkan oleh aplikasi Anda. Solusinya BUKAN dengan mengubah kode Python ini, 
+# tetapi dengan membuat file konfigurasi di repositori GitHub Anda.
+#
+# Ikuti 3 langkah berikut dengan TEPAT:
+#
+# --- LANGKAH 1: Buat file bernama "requirements.txt" ---
+# Pastikan file ini ada di repositori GitHub Anda, di lokasi yang sama dengan app.py.
+# Isi dari file requirements.txt HARUS SAMA PERSIS seperti di bawah ini:
+#
+# streamlit
+# selenium
+# webdriver-manager
+# 2captcha-python
+#
+#
+# --- LANGKAH 2: Buat file bernama "packages.txt" ---
+# File ini juga harus ada di repositori GitHub Anda.
+# Isi dari file packages.txt HARUS SAMA PERSIS seperti di bawah ini:
+#
+# google-chrome-stable
+#
+#
+# --- LANGKAH 3: Reboot Aplikasi Anda ---
+# Setelah menyimpan kedua file di atas ke GitHub, buka aplikasi Anda di Streamlit
+# Cloud, klik "Manage app" di pojok kanan bawah, dan pilih "Reboot".
+#
+# Setelah di-reboot, Streamlit akan menginstal semua yang dibutuhkan dan error akan hilang.
+# ====================================================================================
+
 import streamlit as st
 import time
 import os
