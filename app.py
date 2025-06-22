@@ -12,7 +12,7 @@ st.caption("Menjalankan skrip 'bot.php' dari Inject-ID/easybux melalui antarmuka
 
 # --- Fungsi untuk mengunduh repositori ---
 def download_repo():
-    repo_url = "https://github.com/Inject-ID/easybux/archive/refs/heads/master.zip"
+    repo_url = "https://github.com/Inject-ID/easybux/archive/refs/heads/main.zip"
     with st.spinner("Mengunduh skrip dari GitHub..."):
         try:
             r = requests.get(repo_url, stream=True)
