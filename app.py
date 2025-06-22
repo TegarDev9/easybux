@@ -117,7 +117,7 @@ def main_app():
                         # Menjalankan skrip dan mempersiapkan untuk mengirim input
                         process = subprocess.Popen(
                             ["php", "bot.php"],
-                            stdin=subprocess.PIPE,  # PENTING: untuk mengirim input
+                            stdin=subprocess.PIPE,
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE,
                             text=True,
@@ -127,10 +127,9 @@ def main_app():
                         )
 
                         # Mengirim pilihan menu ke skrip PHP
-                        # Kita tambahkan '\n' untuk mensimulasikan penekanan tombol Enter
                         process.stdin.write(f"{nomor_pilihan}\n")
-                        process.stdin.flush() # Pastikan input terkirim
-                        process.stdin.close() # Tutup input setelah selesai
+                        process.stdin.flush()
+                        process.stdin.close()
 
                         # Menampilkan output dari skrip
                         output_placeholder = st.empty()
@@ -173,7 +172,7 @@ if 'logged_in' not in st.session_state:
 if st.session_state.logged_in:
     main_app()
 else:
-    st.title("� Halaman Login")
+    st.title("🔐 Halaman Login")
     st.write("Silakan login untuk menggunakan Bot Runner.")
     
     with st.form("login_form"):
@@ -189,4 +188,3 @@ else:
                 st.rerun()
             else:
                 st.error("Username atau password salah.")
-�
