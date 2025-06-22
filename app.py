@@ -167,4 +167,3 @@ if run_button:
             if driver:
                 driver.quit()
                 log("Driver Selenium telah ditutup.")
-
